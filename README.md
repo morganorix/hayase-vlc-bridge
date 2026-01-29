@@ -267,6 +267,4 @@ This bridge is particularly useful if:
 
 ---
 
-## License
-
-MIT — use it, modify it, ship it.
+## ![License](https://img.shields.io/badge/license-MIT-green)
