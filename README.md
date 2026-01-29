@@ -46,6 +46,16 @@ This bridge makes the stream reachable without requiring manual interaction.
 
 ---
 
+## Fallback Behavior (Remote → Local)
+
+The script always tries **remote playback first**.
+
+If the remote VLC endpoint is unavailable (network/HTTP/WebSocket failure) or if `websocat` is missing, it will **automatically fall back to local VLC** on the machine running the script.
+
+This is intentional: local playback is considered safer than interrupting the user experience.
+
+---
+
 ## Requirements
 
 ### Local machine
