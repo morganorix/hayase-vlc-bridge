@@ -1,7 +1,6 @@
 # hayase-vlc-bridge
-
 Send Hayase Watch streams to a remote VLC player with automatic local fallback, fail-fast behavior, and configurable logging.
-
+Works with any VLC instance exposing a WebSocket interface.
 Designed for reliable external playback with minimal friction.
 
 ---
@@ -54,7 +53,6 @@ This bridge makes the stream reachable without requiring manual interaction.
 - Bash ≥ 4  
 - python3  
 - curl  
-- websocat  
 - VLC  
 
 Linux is recommended.
