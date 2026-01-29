@@ -1,28 +1,217 @@
 # hayase-vlc-bridge
-Configurable bridge that sends Hayase Watch streams to a remote VLC player, featuring automatic local fallback, fail-fast behavior, and clear logging for dependable external playback.
 
-The goal is simple:
+Send Hayase Watch streams to a remote VLC player with automatic local fallback, fail-fast behavior, and configurable logging.
 
-👉 When you click *Play* in Hayase, the script intercepts the streaming URL and sends it to a remote VLC instance via WebSocket.
-
-If the remote player is unavailable, playback automatically falls back to your local VLC.
+Designed for reliable external playback with minimal friction.
 
 ---
 
-## Concept
+## What It Does
 
-Hayase typically streams content through a local HTTP server (`localhost`).  
-An Apple TV — or any remote device — cannot access that address directly.
+When you press **Play** in Hayase:
 
-This script solves that by:
+1. The script receives the streaming URL  
+2. Rewrites `localhost` to a LAN IP reachable by your remote device  
+3. Normalizes the URL encoding  
+4. Sends the stream to VLC via WebSocket  
+5. Falls back to local VLC if the remote player is unavailable  
 
-1. Receiving the stream URL from Hayase.
-2. Rewriting `localhost` to an IP reachable by the remote device.
-3. Normalizing the URL encoding.
-4. Sending the stream to remote VLC through WebSocket.
-5. Falling back to local VLC if anything fails.
+**Result:** your Apple TV (or any remote device) plays the stream instantly.
 
-### Execution Flow
+---
+
+## Why This Exists
+
+Hayase streams content through a local HTTP server.
+
+Remote devices cannot access:
+
+```
+localhost
+127.0.0.1
+```
+
+This bridge makes the stream reachable without requiring manual interaction.
+
+---
+
+## Features
+
+- Automatic remote playback  
+- Intelligent local fallback  
+- Fail-fast error handling  
+- Fully configurable script  
+- Minimal dependencies  
+- Structured logging  
+- Predictable execution  
+
+---
+
+## Requirements
+
+### Local machine
+
+- Bash ≥ 4  
+- python3  
+- curl  
+- websocat  
+- VLC  
+
+Linux is recommended.
+
+---
+
+### Remote device
+
+A VLC instance capable of receiving WebSocket commands.
+
+Examples include:
+
+- VLC with a WebSocket bridge  
+- Node-based VLC remote controller  
+- Custom HTTP/WebSocket wrapper  
+
+> The script assumes a working WebSocket endpoint.
+
+---
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/<your-user>/hayase-vlc-bridge.git
+cd hayase-vlc-bridge
+```
+
+Make the script executable:
+
+```bash
+chmod +x hayase-vlc-bridge.sh
+```
+
+Then configure it inside Hayase:
+
+```
+Settings → Player → External Player
+```
+
+Set the command to:
+
+```
+/path/to/hayase-vlc-bridge.sh
+```
+
+---
+
+## Configuration
+
+Only edit the **CONFIG** section at the top of the script.
+
+The script is intentionally designed to be configured directly rather than through environment variables, ensuring predictable behavior when launched automatically by Hayase.
+
+---
+
+### Stream Host (IMPORTANT)
+
+```bash
+STREAM_HOST="192.168.x.x"
+```
+
+This must be reachable from the remote device.
+
+Do NOT use:
+
+- `localhost`  
+- `127.0.0.1`  
+
+Use your LAN IP instead.
+
+---
+
+### Remote VLC
+
+```bash
+REMOTE_HOST="192.168.x.x"
+WS_URL="ws://${REMOTE_HOST}"
+```
+
+Example WebSocket endpoint:
+
+```
+ws://192.168.1.50:8080
+```
+
+---
+
+### Local VLC Command
+
+Default (Flatpak):
+
+```bash
+VLC_LOCAL=(flatpak run org.videolan.VLC --one-instance)
+```
+
+If you installed VLC natively:
+
+```bash
+VLC_LOCAL=(vlc --one-instance)
+```
+
+AppImage example:
+
+```bash
+VLC_LOCAL=(~/Applications/VLC.AppImage)
+```
+
+---
+
+### Logging
+
+```bash
+LOG_VERBOSITY=0
+```
+
+| Value | Behavior |
+|--------|------------|
+| 0 | Disabled |
+| 1 | Basic logs |
+| 2 | Debug logs |
+
+Log location is fully configurable:
+
+```bash
+LOG_DIR="..."
+LOG_FILE="..."
+```
+
+You may freely change both the directory and filename.
+
+---
+
+## Execution Model
+
+### Hard failures (script stops)
+
+- Missing URL  
+- Invalid URL  
+- Parsing failure  
+
+These typically indicate a broken stream.
+
+---
+
+### Soft failures (automatic fallback)
+
+- Remote VLC unreachable  
+- WebSocket failure  
+- Missing `websocat`  
+
+Local playback is considered safer than interrupting the user experience.
+
+---
+
+## How It Works
 
 ```
 Hayase
@@ -33,7 +222,7 @@ Rewrite URL (localhost → LAN IP)
    ↓
 Send to Remote VLC (WebSocket)
    ↓
-Apple TV plays the stream
+Remote device plays the stream
 ```
 
 Fallback path:
@@ -44,217 +233,42 @@ Remote unavailable → Local VLC launches automatically
 
 ---
 
-## Requirements
+## Design Principles
 
-### Local machine
+This project prioritizes:
 
-- Bash (Linux recommended)
-- `python3`
-- `curl`
-- VLC (Flatpak version in the default config)
+- deterministic behavior  
+- fail-fast execution  
+- minimal moving parts  
+- low operational friction  
+- clear failure states  
+- maintainability  
 
----
-
-### Remote device
-
-You need a VLC instance capable of receiving WebSocket commands.
-
-Common setups include:
-
-- VLC with a WebSocket bridge
-- Node-based VLC remote controller
-- Custom VLC HTTP/WebSocket wrapper
-
-*(The script assumes a WebSocket endpoint exists.)*
+The goal is not feature bloat — it is reliability.
 
 ---
 
-## Configuration
+## When Should You Use This?
 
-Only modify the **CONFIG** section at the top of the script.
+This bridge is particularly useful if:
 
-```bash
-# Logging level
-LOG_VERBOSITY=0
-```
-
-| Value | Behavior |
-|--------|------------|
-| 0 | No file logs |
-| 1 | Basic logs |
-| 2 | Detailed debug logs |
+- You watch Hayase on a desktop but prefer playback on a TV  
+- Your remote device cannot access localhost streams  
+- You want automatic playback without manual URL handling  
+- You value predictable behavior over complex tooling  
 
 ---
 
-### Paths
-
-```bash
-LOG_DIR="${HOME}/.local/logs"
-LOG_FILE="${LOG_DIR}/hayase-vlc-appletv.log"
-```
-
-Where logs will be stored.
-
----
-
-### Remote VLC
-
-```bash
-REMOTE_HOST="ssalon.local"
-WS_URL="ws://${REMOTE_HOST}"
-```
-
-- `REMOTE_HOST` → hostname or IP of the remote VLC server.
-- `WS_URL` → WebSocket endpoint.
-
-Example:
-
-```
-ws://192.168.1.50:8080
-```
-
----
-
-### Stream Host (VERY IMPORTANT)
-
-```bash
-STREAM_HOST="192.168.2.68"
-```
-
-This must be the IP address reachable **from the Apple TV**.
-
-Do NOT use:
-
-- `localhost`
-- `127.0.0.1`
-
-Use your LAN IP instead.
-
----
-
-### Local VLC Command
-
-```bash
-VLC_LOCAL=(flatpak run org.videolan.VLC --one-instance)
-```
-
-Examples:
-
-Standard VLC:
-
-```bash
-VLC_LOCAL=(vlc)
-```
-
-AppImage:
-
-```bash
-VLC_LOCAL=(~/Applications/VLC.AppImage)
-```
-
----
-
-## Integrating with Hayase
-
-Open:
-
-```
-Settings → Player → External Player
-```
-
-Set the command to your script:
-
-```
-/path/to/script.sh
-```
-
-Make it executable first:
-
-```bash
-chmod +x script.sh
-```
-
-Now when you press **Play** inside Hayase:
-
-✅ The script receives the URL  
-✅ Sends it to remote VLC  
-✅ Apple TV starts playing  
-
-No additional interaction required.
-
----
-
-## Behavior Philosophy
-
-This script follows a strict execution model:
-
-### Hard failures (script stops)
-
-- No URL received
-- Invalid URL
-- Parsing failure
-
-These indicate a broken stream.
-
----
-
-### Soft failures (fallback triggered)
-
-- Remote VLC unreachable  
-- WebSocket failure  
-- `websocat` missing  
-
-Local playback is considered safer than interrupting the user.
-
----
-
-## Logging
-
-Logs are written only if enabled.
-
-Example:
-
-```
-~/.local/logs/hayase-vlc-appletv.log
-```
-
-Useful for diagnosing:
-
-- Network issues
-- WebSocket errors
-- URL rewriting problems
-
----
-
-## Why This Exists
-
-Streaming torrents to an Apple TV is often frustrating because:
-
-- Hayase streams locally
-- Apple TV cannot access localhost
-- Many remote player solutions are unreliable
-
-This script focuses on:
-
-✔ deterministic behavior  
-✔ minimal dependencies  
-✔ clear failure handling  
-✔ zero UI friction  
-
----
-
-## Possible Improvements
-
-Ideas if you want to extend it:
+## Possible Future Improvements
 
 - mDNS auto-discovery of the remote host  
-- Multiple remote players  
+- Support for multiple remote players  
 - Retry logic before fallback  
-- Native Swift bridge for tvOS  
-- Dockerized VLC WebSocket server  
+- Optional health-check mode  
+- Containerized VLC WebSocket server  
 
 ---
 
 ## License
 
-MIT — do whatever you want with it.
+MIT — use it, modify it, ship it.
