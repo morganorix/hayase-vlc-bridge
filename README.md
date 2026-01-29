@@ -52,7 +52,8 @@ This bridge makes the stream reachable without requiring manual interaction.
 
 - Bash ≥ 4  
 - python3  
-- curl  
+- curl
+- websocat
 - VLC  
 
 Linux is recommended.
