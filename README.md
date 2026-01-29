@@ -51,18 +51,7 @@ Remote unavailable → Local VLC launches automatically
 - Bash (Linux recommended)
 - `python3`
 - `curl`
-- `websocat`
 - VLC (Flatpak version in the default config)
-
-Install websocat:
-
-```bash
-cargo install websocat
-```
-
-or download a binary:
-
-https://github.com/vi/websocat/releases
 
 ---
 
