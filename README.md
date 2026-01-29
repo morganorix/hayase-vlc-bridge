@@ -258,14 +258,4 @@ This bridge is particularly useful if:
 
 ---
 
-## Possible Future Improvements
-
-- mDNS auto-discovery of the remote host  
-- Support for multiple remote players  
-- Retry logic before fallback  
-- Optional health-check mode  
-- Containerized VLC WebSocket server  
-
----
-
 ## ![License](https://img.shields.io/badge/license-MIT-green)
