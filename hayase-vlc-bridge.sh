@@ -111,7 +111,13 @@ require_cmd_or_abort() {
 }
 
 # Create log directory only if logging is enabled
-logs_enabled && mkdir -p "$LOG_DIR"
+# If it fails, disable file logging and continue (do not break playback).
+if logs_enabled; then
+  if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
+    printf 'WARN: cannot create LOG_DIR (%s). Disabling file logging.\n' "$LOG_DIR" >&2
+    LOG_VERBOSITY=0
+  fi
+fi
 
 # ============================================================
 # START
