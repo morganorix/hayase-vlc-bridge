@@ -234,7 +234,9 @@ Remote unavailable → Local VLC launches automatically
 
 ## Design Principles
 
-This project prioritizes:
+The project intentionally maintains a narrow scope to preserve reliability and simplicity.
+
+It prioritizes:
 
 - deterministic behavior  
 - fail-fast execution  
