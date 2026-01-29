@@ -1,33 +1,51 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+
+# ------------------------------------------------------------
+# Hayase VLC Bridge
+# Sends Hayase stream URLs to a remote VLC instance
+# with automatic local fallback.
+#
+# Requirements:
+# - bash >= 4
+# - python3
+# - curl
+# - websocat
+# - VLC
+# ------------------------------------------------------------
+
+VERSION="1.0.0"
 
 # ============================================================
 # CONFIG (modifiable uniquement ici)
 # ============================================================
 
-# 0 = pas de logs fichier
-# 1 = logs simples
-# 2 = logs détaillés
+# 0 = no file logging
+# 1 = simple logs
+# 2 = detailed logs
 LOG_VERBOSITY=0
 
-LOG_DIR="${HOME}/.local/logs"
-LOG_FILE="${LOG_DIR}/hayase-vlc-appletv.log"
+# Log file location
+# You can freely change both the directory and filename.
+LOG_DIR="${HOME}/<YOUR_LOCAL_DIRECTORY_LOGS>"
+LOG_FILE="${LOG_DIR}/hayase-vlc-bridge.log"
 
-REMOTE_HOST="ssalon.local"
+REMOTE_HOST="<URL_REMOTE>"
 WS_URL="ws://${REMOTE_HOST}"
 
-# IP joignable depuis l'Apple TV
-STREAM_HOST="192.168.2.68"
+# IP reachable from Apple TV
+STREAM_HOST="<YOUR_LOCAL_IP>"
 
-# VLC local (Flatpak)
+# VLC local command
+# Default uses Flatpak.
+# If you installed VLC natively, replace with for example:
+# VLC_LOCAL=(vlc --one-instance)
 VLC_LOCAL=(flatpak run org.videolan.VLC --one-instance)
 
 # ============================================================
-# Ignore override environnement
+# Ignore environment overrides
 # ============================================================
 unset HAYASE_LOG_LEVEL HAYASE_LOG_ENABLED HAYASE_LOG_VERBOSITY
-
-mkdir -p "$LOG_DIR"
 
 ts() { date -Is; }
 
@@ -45,6 +63,7 @@ log_line() {
   logs_enabled || return 0
   printf '[%s] %-5s %s\n' "$(ts)" "$lvl" "$*" >> "$LOG_FILE"
 }
+
 log_debug() { logs_debug && log_line DEBUG "$*" || true; }
 
 blank() { logs_enabled && printf '\n' >> "$LOG_FILE" || true; }
@@ -64,16 +83,14 @@ finish_block() {
 RAW_TARGET=""
 
 abort() {
-  # stop total (pas de fallback)
   err "$1"
   finish_block
   exit 1
 }
 
 fallback() {
-  # fallback local (uniquement quand le flux est valide)
   warn "$1"
-  warn "Fallback: lancement VLC local (flatpak)"
+  warn "Fallback: launching local VLC."
   log_debug "URL(local)=<${RAW_TARGET}>"
   finish_block
   exec "${VLC_LOCAL[@]}" "${RAW_TARGET}"
@@ -89,74 +106,120 @@ require_cmd_or_fallback() {
   command -v "$1" >/dev/null 2>&1 || fallback "$2"
 }
 
+require_cmd_or_abort() {
+  command -v "$1" >/dev/null 2>&1 || abort "$2"
+}
+
+# Create log directory only if logging is enabled
+logs_enabled && mkdir -p "$LOG_DIR"
+
 # ============================================================
 # START
 # ============================================================
 blank
 sep
+log_line INFO "Hayase VLC Bridge v${VERSION}"
 log_line INFO "===== START ====="
 log_line INFO "Args: $#"
 log_debug "CONFIG: LOG_VERBOSITY=$LOG_VERBOSITY STREAM_HOST=$STREAM_HOST REMOTE_HOST=$REMOTE_HOST"
 
 # ------------------------------------------------------------
-# Étape 1 : récupérer la source du flux
-# -> si ça échoue : STOP TOTAL
+# Configuration validation
 # ------------------------------------------------------------
-step "Récupération de la source du flux (URL Hayase)…"
-[[ $# -ge 1 ]] || abort "Récupération du flux impossible : aucune URL reçue."
+step "Checking configuration…"
+
+[[ "$REMOTE_HOST" != "<URL_REMOTE>" ]] \
+  || abort "REMOTE_HOST is not configured. Please edit the script."
+
+[[ "$STREAM_HOST" != "<YOUR_LOCAL_IP>" ]] \
+  || abort "STREAM_HOST is not configured. Please edit the script."
+
+[[ "$LOG_DIR" != *"<YOUR_LOCAL_DIRECTORY_LOGS>"* ]] \
+  || abort "LOG_DIR is not configured. Please edit the script."
+
+ok "Configuration valid."
+
+# ------------------------------------------------------------
+# Dependencies
+# ------------------------------------------------------------
+step "Checking required dependencies…"
+
+require_cmd_or_abort python3 "python3 is required for URL normalization."
+require_cmd_or_abort curl "curl is required to check remote VLC."
+
+ok "Core dependencies detected."
+
+# ------------------------------------------------------------
+# Step 1 — Retrieve stream
+# ------------------------------------------------------------
+step "Retrieving stream source from Hayase…"
+
+[[ $# -ge 1 ]] || abort "Stream retrieval failed: no URL provided."
+
 RAW_TARGET="$*"
 log_debug "URL(raw)=<${RAW_TARGET}>"
 
-# Petit garde-fou : on veut une URL (Hayase envoie en général http(s)://...)
-[[ "$RAW_TARGET" == *"://"* ]] || abort "Récupération du flux invalide : argument non-URL."
+[[ "$RAW_TARGET" == *"://"* ]] \
+  || abort "Invalid stream source: argument is not a valid URL."
 
-ok "Flux torrent trouvé."
+ok "Stream source detected."
 
 # ------------------------------------------------------------
-# Étape 2 : parsing / préparation
-# -> si parsing KO : STOP TOTAL
+# Step 2 — Prepare / parse URL
 # ------------------------------------------------------------
-step "Réécriture de l'URL pour qu'elle soit joignable depuis l'Apple TV…"
+step "Rewriting URL for Apple TV network access…"
+
 target="$RAW_TARGET"
 target="${target/http:\/\/localhost:/http:\/\/$STREAM_HOST:}"
 target="${target/http:\/\/127.0.0.1:/http:\/\/$STREAM_HOST:}"
-log_debug "URL(rewrite-host)=<$target>"
-ok "Hôte réécrit."
 
-step "Normalisation de l'encodage de l'URL…"
-target="$(normalize_url "$target")" || abort "Flux mal parsé : normalisation URL impossible (python3/urllib)."
-[[ -n "$target" ]] || abort "Flux mal parsé : URL vide après normalisation."
-ok "Flux parsé."
+log_debug "URL(rewrite-host)=<$target>"
+ok "Host rewritten."
+
+step "Normalizing URL encoding…"
+
+target="$(normalize_url "$target")" \
+  || abort "Malformed stream: URL normalization failed."
+
+[[ -n "$target" ]] \
+  || abort "Malformed stream: empty URL after normalization."
+
+ok "Stream parsed."
 
 log_line INFO  "URL(final)=<$(shorten "$target")>"
 log_debug "URL(final-full)=<$target>"
 
 # ------------------------------------------------------------
-# Étape 3 : remote (si remote KO -> fallback local)
+# Step 3 — Remote playback
 # ------------------------------------------------------------
-step "Vérification du serveur VLC distant…"
+step "Checking remote VLC server availability…"
+
 curl -fsS --max-time 2 "http://${REMOTE_HOST}/" >/dev/null 2>&1 \
-  || fallback "Serveur VLC distant injoignable (http://${REMOTE_HOST}/)."
-ok "Serveur VLC distant joignable."
+  || fallback "Remote VLC server unreachable (http://${REMOTE_HOST}/)."
 
-step "Vérification de websocat…"
-require_cmd_or_fallback websocat "websocat manquant (impossible d'envoyer au VLC distant)."
-ok "websocat OK."
+ok "Remote VLC reachable."
 
-step "Envoi de l'URL au VLC distant (WebSocket)…"
+step "Checking websocat dependency…"
+
+require_cmd_or_fallback websocat "websocat missing (cannot send to remote VLC)."
+ok "websocat detected."
+
+step "Sending stream to remote VLC via WebSocket…"
+
 json_cmd="$(python3 -c 'import json,sys; print(json.dumps({"type":"openURL","url":sys.argv[1]}))' "$target")"
+
 log_debug "WS url=<$WS_URL>"
 log_debug "WS json=<$json_cmd>"
 
 resp="$(printf '%s\n' "$json_cmd" | websocat -n1 "$WS_URL" 2>&1)" \
-  || fallback "WebSocket a échoué (envoi impossible)."
+  || fallback "WebSocket transmission failed."
 
-log_line INFO "Réponse VLC=<$resp>"
+log_line INFO "VLC response=<$resp>"
 
 echo "$resp" | grep -qiE "INVALID REQUEST|error|failed" \
-  && fallback "Réponse WebSocket indique une erreur."
+  && fallback "WebSocket response indicates an error."
 
-ok "Commande envoyée au VLC distant (pas d’erreur détectée)."
+ok "Command successfully sent to remote VLC."
 
 finish_block
 exit 0
