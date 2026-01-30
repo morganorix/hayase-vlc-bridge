@@ -58,6 +58,26 @@ This is intentional: local playback is considered safer than interrupting the us
 
 ## Requirements
 
+## Remote VLC Requirement
+
+The remote VLC instance **must allow remote control** (for example via the Web interface or another control interface compatible with your setup).
+
+By default, VLC restricts its control interfaces to `localhost`, meaning they are not reachable from other devices until remote access is explicitly enabled.
+
+This bridge works with any environment where VLC can be controlled remotely, including:
+
+- Android TV  
+- Apple TV (via a bridge/controller)  
+- Desktop systems  
+- Media servers  
+
+👉 Official VLC documentation:  
+https://docs.videolan.me/vlc-user/desktop/3.0/en/advanced/interfaces/remote/
+
+> The script assumes that a reachable remote-control endpoint is already operational.
+
+---
+
 ### Local machine
 
 - Bash ≥ 4  
