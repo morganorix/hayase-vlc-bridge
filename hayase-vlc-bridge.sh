@@ -34,7 +34,7 @@ REMOTE_HOST="<URL_REMOTE>"
 WS_URL="ws://${REMOTE_HOST}"
 
 # IP reachable from Apple TV
-STREAM_HOST="192.168.2.68"
+STREAM_HOST="<YOUR_LOCAL_IP>"
 
 # VLC local command
 # Default uses Flatpak.
