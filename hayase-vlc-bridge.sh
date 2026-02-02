@@ -23,14 +23,14 @@ VERSION="1.0.1"
 # 0 = no file logging
 # 1 = simple logs
 # 2 = detailed logs
-LOG_VERBOSITY=2
+LOG_VERBOSITY=0
 
 # Log file location
 # You can freely change both the directory and filename.
-LOG_DIR="${HOME}/.local/logs/"
+LOG_DIR="${HOME}/<YOUR_LOCAL_DIRECTORY_LOGS>/"
 LOG_FILE="${LOG_DIR}/hayase-vlc-bridge.log"
 
-REMOTE_HOST="salon.local"
+REMOTE_HOST="<URL_REMOTE>"
 WS_URL="ws://${REMOTE_HOST}"
 
 # IP reachable from Apple TV
