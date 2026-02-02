@@ -14,7 +14,7 @@ set -Eeuo pipefail
 # - VLC
 # ------------------------------------------------------------
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 # ============================================================
 # CONFIG (modifiable uniquement ici)
@@ -23,18 +23,18 @@ VERSION="1.0.0"
 # 0 = no file logging
 # 1 = simple logs
 # 2 = detailed logs
-LOG_VERBOSITY=0
+LOG_VERBOSITY=2
 
 # Log file location
 # You can freely change both the directory and filename.
-LOG_DIR="${HOME}/<YOUR_LOCAL_DIRECTORY_LOGS>"
+LOG_DIR="${HOME}/.local/logs/"
 LOG_FILE="${LOG_DIR}/hayase-vlc-bridge.log"
 
-REMOTE_HOST="<URL_REMOTE>"
+REMOTE_HOST="salon.local"
 WS_URL="ws://${REMOTE_HOST}"
 
 # IP reachable from Apple TV
-STREAM_HOST="<YOUR_LOCAL_IP>"
+STREAM_HOST="192.168.2.68"
 
 # VLC local command
 # Default uses Flatpak.
@@ -96,10 +96,18 @@ fallback() {
   exec "${VLC_LOCAL[@]}" "${RAW_TARGET}"
 }
 
-normalize_url() {
-  python3 -c 'import sys,urllib.parse;
-u=urllib.parse.unquote(sys.argv[1]);
-print(urllib.parse.quote(u, safe=":/%?=&"))' "$1"
+# Speed: normalize URL + build WS JSON in ONE python call (instead of 2).
+# Prints:
+#   line 1: normalized URL
+#   line 2: json payload
+normalize_and_build_json() {
+  python3 - <<'PY' "$1"
+import json,sys,urllib.parse
+u = urllib.parse.unquote(sys.argv[1])
+u = urllib.parse.quote(u, safe=":/%?=&")
+print(u)
+print(json.dumps({"type":"openURL","url":u}))
+PY
 }
 
 require_cmd_or_fallback() {
@@ -184,11 +192,18 @@ ok "Host rewritten."
 
 step "Normalizing URL encoding…"
 
-target="$(normalize_url "$target")" \
+# Speed: single python call returns normalized URL + JSON
+mapfile -t __norm < <(normalize_and_build_json "$target") \
   || abort "Malformed stream: URL normalization failed."
+
+target="${__norm[0]:-}"
+json_cmd="${__norm[1]:-}"
 
 [[ -n "$target" ]] \
   || abort "Malformed stream: empty URL after normalization."
+
+[[ -n "$json_cmd" ]] \
+  || abort "Malformed stream: empty JSON after normalization."
 
 ok "Stream parsed."
 
@@ -200,7 +215,8 @@ log_debug "URL(final-full)=<$target>"
 # ------------------------------------------------------------
 step "Checking remote VLC server availability…"
 
-curl -fsS --max-time 2 "http://${REMOTE_HOST}/" >/dev/null 2>&1 \
+# Speed: faster fail when remote is down
+curl -fsS --connect-timeout 0.3 --max-time 0.8 "http://${REMOTE_HOST}/" >/dev/null 2>&1 \
   || fallback "Remote VLC server unreachable (http://${REMOTE_HOST}/)."
 
 ok "Remote VLC reachable."
@@ -212,8 +228,6 @@ ok "websocat detected."
 
 step "Sending stream to remote VLC via WebSocket…"
 
-json_cmd="$(python3 -c 'import json,sys; print(json.dumps({"type":"openURL","url":sys.argv[1]}))' "$target")"
-
 log_debug "WS url=<$WS_URL>"
 log_debug "WS json=<$json_cmd>"
 
@@ -222,8 +236,13 @@ resp="$(printf '%s\n' "$json_cmd" | websocat -n1 "$WS_URL" 2>&1)" \
 
 log_line INFO "VLC response=<$resp>"
 
-echo "$resp" | grep -qiE "INVALID REQUEST|error|failed" \
-  && fallback "WebSocket response indicates an error."
+# Speed: avoid spawning grep
+shopt -s nocasematch
+if [[ "$resp" == *"INVALID REQUEST"* || "$resp" == *"error"* || "$resp" == *"failed"* ]]; then
+  shopt -u nocasematch
+  fallback "WebSocket response indicates an error."
+fi
+shopt -u nocasematch
 
 ok "Command successfully sent to remote VLC."
 
