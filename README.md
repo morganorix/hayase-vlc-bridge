@@ -135,9 +135,17 @@ Set the command to:
 
 ## Configuration
 
-Only edit the **CONFIG** section at the top of the script.
+Configuration is done via a **.env** file located next to the script.
 
-The script is intentionally designed to be configured directly rather than through environment variables, ensuring predictable behavior when launched automatically by Hayase.
+By default, the script loads:
+
+- `./.env` (same directory as `hayase-vlc-bridge.sh`)
+
+You can override the .env path by exporting:
+
+```bash
+HAYASE_ENV_FILE="/path/to/.env"
+
 
 ---
 
