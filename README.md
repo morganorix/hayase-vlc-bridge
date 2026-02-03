@@ -1,12 +1,12 @@
 # hayase-vlc-bridge
-Send Hayase Watch streams to a remote VLC player with automatic local fallback, fail-fast behavior, and configurable logging.
-Works with any VLC instance exposing a WebSocket interface.
-Designed for reliable external playback with minimal friction.
-
 > **Light version (beta)**  
 > A highly compressed **light** variant of the script is now available and currently in **beta testing**.  
 > It keeps the same core behavior (remote playback + automatic local fallback) while reducing file size and startup overhead.  
 > Use it if you want a minimal footprint, and report any issues or regressions you find.
+
+Send Hayase Watch streams to a remote VLC player with automatic local fallback, fail-fast behavior, and configurable logging.
+Works with any VLC instance exposing a WebSocket interface.
+Designed for reliable external playback with minimal friction.
 
 ---
 
