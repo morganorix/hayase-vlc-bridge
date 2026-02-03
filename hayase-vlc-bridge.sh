@@ -17,35 +17,32 @@ set -Eeuo pipefail
 VERSION="1.0.1"
 
 # ============================================================
-# CONFIG (modifiable uniquement ici)
+# CONFIG (loaded from .env next to this script)
 # ============================================================
 
-# 0 = no file logging
-# 1 = simple logs
-# 2 = detailed logs
-LOG_VERBOSITY=0
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${SCRIPT_DIR}/.env"
 
-# Log file location
-# You can freely change both the directory and filename.
-LOG_DIR="${HOME}/<YOUR_LOCAL_DIRECTORY_LOGS>/"
-LOG_FILE="${LOG_DIR}/hayase-vlc-bridge.log"
+[[ -f "$ENV_FILE" ]] || { printf 'ERROR: missing .env next to script. Copy .env.example to .env.\n' >&2; exit 1; }
 
-REMOTE_HOST="<URL_REMOTE>"
-WS_URL="ws://${REMOTE_HOST}"
+# shellcheck disable=SC1090
+source "$ENV_FILE"
 
-# IP reachable from Apple TV
-STREAM_HOST="<YOUR_LOCAL_IP>"
+# Compute/normalize a few derived values (minimal, non-invasive)
+WS_URL="${WS_URL:-ws://${REMOTE_HOST}}"
+LOG_DIR="${LOG_DIR%/}"                         # remove trailing slash if any
+LOG_FILE="${LOG_FILE:-$LOG_DIR/hayase-vlc-bridge.log}"
 
-# VLC local command
-# Default uses Flatpak.
-# If you installed VLC natively, replace with for example:
-# VLC_LOCAL=(vlc --one-instance)
-VLC_LOCAL=(flatpak run org.videolan.VLC --one-instance)
+# VLC command from .env (simple space-splitting)
+read -r -a VLC_LOCAL <<<"${VLC_LOCAL_CMD:-}"
 
 # ============================================================
 # Ignore environment overrides
 # ============================================================
 unset HAYASE_LOG_LEVEL HAYASE_LOG_ENABLED HAYASE_LOG_VERBOSITY
+
+# Secure defaults for created files (logs)
+umask 077
 
 ts() { date -Is; }
 
@@ -118,12 +115,33 @@ require_cmd_or_abort() {
   command -v "$1" >/dev/null 2>&1 || abort "$2"
 }
 
-# Create log directory only if logging is enabled
+# ------------------------------------------------------------
+# Configuration validation (from .env)
+# ------------------------------------------------------------
+
+[[ -n "${REMOTE_HOST:-}" && "$REMOTE_HOST" != "<URL_REMOTE>" ]] \
+  || { printf 'ERROR: REMOTE_HOST is not configured in .env.\n' >&2; exit 1; }
+
+[[ -n "${STREAM_HOST:-}" && "$STREAM_HOST" != "<YOUR_LOCAL_IP>" ]] \
+  || { printf 'ERROR: STREAM_HOST is not configured in .env.\n' >&2; exit 1; }
+
+[[ -n "${LOG_DIR:-}" && "$LOG_DIR" != *"<YOUR_LOCAL_DIRECTORY_LOGS>"* ]] \
+  || { printf 'ERROR: LOG_DIR is not configured in .env.\n' >&2; exit 1; }
+
+[[ -n "${VLC_LOCAL_CMD:-}" ]] \
+  || { printf 'ERROR: VLC_LOCAL_CMD is not configured in .env.\n' >&2; exit 1; }
+
+# Create log directory/file only if logging is enabled.
 # If it fails, disable file logging and continue (do not break playback).
 if logs_enabled; then
   if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
     printf 'WARN: cannot create LOG_DIR (%s). Disabling file logging.\n' "$LOG_DIR" >&2
     LOG_VERBOSITY=0
+  elif ! touch "$LOG_FILE" 2>/dev/null; then
+    printf 'WARN: cannot create LOG_FILE (%s). Disabling file logging.\n' "$LOG_FILE" >&2
+    LOG_VERBOSITY=0
+  else
+    chmod 600 "$LOG_FILE" 2>/dev/null || true
   fi
 fi
 
@@ -136,22 +154,6 @@ log_line INFO "Hayase VLC Bridge v${VERSION}"
 log_line INFO "===== START ====="
 log_line INFO "Args: $#"
 log_debug "CONFIG: LOG_VERBOSITY=$LOG_VERBOSITY STREAM_HOST=$STREAM_HOST REMOTE_HOST=$REMOTE_HOST"
-
-# ------------------------------------------------------------
-# Configuration validation
-# ------------------------------------------------------------
-step "Checking configuration…"
-
-[[ "$REMOTE_HOST" != "<URL_REMOTE>" ]] \
-  || abort "REMOTE_HOST is not configured. Please edit the script."
-
-[[ "$STREAM_HOST" != "<YOUR_LOCAL_IP>" ]] \
-  || abort "STREAM_HOST is not configured. Please edit the script."
-
-[[ "$LOG_DIR" != *"<YOUR_LOCAL_DIRECTORY_LOGS>"* ]] \
-  || abort "LOG_DIR is not configured. Please edit the script."
-
-ok "Configuration valid."
 
 # ------------------------------------------------------------
 # Dependencies
