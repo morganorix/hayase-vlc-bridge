@@ -143,10 +143,9 @@ By default, the script loads:
 
 You can override the .env path by exporting:
 
-```bash
+```
 HAYASE_ENV_FILE="/path/to/.env"
-
-
+```
 ---
 
 ### Stream Host (IMPORTANT)
