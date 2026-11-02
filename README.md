@@ -124,6 +124,15 @@ Make the script executable:
 chmod +x hayase-vlc-bridge.sh
 ```
 
+Create your local configuration from the template:
+
+```bash
+cp .env.example .env
+# then edit .env with your values
+```
+
+> `.env` is gitignored, so your real hosts/IPs stay out of version control.
+
 Then configure it inside Hayase:
 
 ```
@@ -141,6 +150,7 @@ Set the command to:
 ## Configuration
 
 Configuration is done via a **.env** file located next to the script.
+Copy the provided **`.env.example`** to **`.env`** and edit the values.
 
 By default, the script loads:
 
@@ -187,16 +197,31 @@ ws://192.168.1.50:8080
 
 ### Local VLC Command
 
+Set as a single string (it is split into arguments with `shlex`):
+
 Default (Flatpak):
 
 ```bash
-VLC_LOCAL=(flatpak run org.videolan.VLC --one-instance)
+VLC_LOCAL_CMD="flatpak run org.videolan.VLC --one-instance"
 ```
 
 If you installed VLC natively:
 
 ```bash
-VLC_LOCAL=(vlc --one-instance)
+VLC_LOCAL_CMD="vlc --one-instance"
+```
+
+---
+
+### Remote reachability (optional)
+
+The script checks the remote VLC with a fast, fail-fast `curl` probe before
+sending the stream. Tune the timeouts (in seconds) if your remote is on a
+higher-latency network and gets wrongly considered unreachable:
+
+```bash
+CONNECT_TIMEOUT="0.3"   # connection timeout
+MAX_TIME="0.8"          # total time budget for the probe
 ```
 
 AppImage example:
