@@ -1,0 +1,5 @@
+# Local configuration (copy .env.example to .env and edit it)
+.env
+
+# Logs
+*.log
